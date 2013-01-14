@@ -12,7 +12,15 @@
 
 #include <X11/Xlib.h>
 
-char *tzberlin = "Europe/Berlin";
+char *tzberlin = "Europe/Amsterdam";
+
+//Colours
+const char *red = "\x1b[38;5;196m";
+const char *green = "\x1b[38;5;40m";
+const char *yellow = "\x1b[38;5;226m";
+const char *blue = "\x1b[38;5;21m";
+const char *grey = "\x1b[38;5;246m";
+const char *reset = "\x1b[0m";
 
 static Display *dpy;
 
@@ -40,6 +48,27 @@ smprintf(char *fmt, ...)
 	return ret;
 }
 
+char *
+readfile(char *base, char *file)
+{
+    char *path, line[513];
+    FILE *fd;
+
+    memset(line, 0, sizeof(line));
+
+    path = smprintf("%s/%s", base, file);
+    fd = fopen(path, "r");
+    if (fd == NULL)
+        return NULL;
+    free(path);
+
+    if (fgets(line, sizeof(line)-1, fd) == NULL)
+        return NULL;
+    fclose(fd);
+
+    return smprintf("%s", line);
+}
+
 void
 settz(char *tzname)
 {
@@ -51,7 +80,7 @@ int
 parse_netdev(unsigned long long int *receivedabs, unsigned long long int *sentabs)
 {
     char *buf;
-    char *eth0start;
+    char *wlan0start;
     static int bufsize;
     FILE *devfd;
 
@@ -64,10 +93,10 @@ parse_netdev(unsigned long long int *receivedabs, unsigned long long int *sentab
     fgets(buf, bufsize, devfd);
 
     while (fgets(buf, bufsize, devfd)) {
-        if ((eth0start = strstr(buf, "eth0:")) != NULL) {
+        if ((wlan0start = strstr(buf, "wlan0:")) != NULL) {
 
         // With thanks to the conky project at http://conky.sourceforge.net/
-        sscanf(eth0start + 6, "%llu  %*d     %*d  %*d  %*d  %*d   %*d        %*d       %llu",\
+        sscanf(wlan0start + 6, "%llu  %*d     %*d  %*d  %*d  %*d   %*d        %*d       %llu",\
                receivedabs, sentabs);
         fclose(devfd);
         free(buf);
@@ -129,27 +158,6 @@ get_netusage()
 //END NET USAGE
 
 //BATTERY
-char *
-readfile(char *base, char *file)
-{
-    char *path, line[513];
-    FILE *fd;
-
-    memset(line, 0, sizeof(line));
-
-    path = smprintf("%s/%s", base, file);
-    fd = fopen(path, "r");
-    if (fd == NULL)
-        return NULL;
-    free(path);
-
-    if (fgets(line, sizeof(line)-1, fd) == NULL)
-        return NULL;
-    fclose(fd);
-
-    return smprintf("%s", line);
-}
-
 /*
  * Linux seems to change the filenames after suspend/hibernate
  * according to a random scheme. So just check for both possibilities.
@@ -159,6 +167,8 @@ getbattery(char *base)
 {
     char *co;
     int descap, remcap;
+    float bat;
+    char stat[12];
 
     descap = -1;
     remcap = -1;
@@ -188,10 +198,30 @@ getbattery(char *base)
     sscanf(co, "%d", &remcap);
     free(co);
 
+    co = readfile(base, "status");
+    sscanf(co, "%s", stat);
+    free(co);
+
     if (remcap < 0 || descap < 0)
         return smprintf("invalid");
 
-    return smprintf("%.0f", ((float)remcap / (float)descap) * 100);
+
+    bat = ((float)remcap / (float)descap) * 100;
+
+    if(strncmp(stat, "Discharging", 11) == 0) {
+        if(bat < 20) {
+            return smprintf("%s%.0f%%%s", red, bat, reset);
+
+        } else if(bat > 80) {
+            return smprintf("%s%.0f%%%s", green, bat, reset);
+        } else {
+            return smprintf("%s%.0f%%%s", yellow, bat, reset);
+        }
+    } else if(strncmp(stat, "Charging", 8) == 0) {
+        return smprintf("%s%.0f%%%s", blue, bat, reset);
+    } else {
+        return smprintf("%s%.0f%%%s", blue, bat, reset);
+    }
 }
 // END BATTERY
 
@@ -253,13 +283,13 @@ main(void)
 		return 1;
 	}
 
-	for (;;sleep(90)) {
+	for (;;sleep(2)) {
 		avgs = loadavg();
 		tmbln = mktimes("%a, %d %b %H:%M %Y", tzberlin);
         netstats = get_netusage();
         battery = getbattery("/sys/class/power_supply/BAT0/");
 
-        status = smprintf("[L: %s|N: %s|B: %s%|%s]",
+        status = smprintf("L %s|N %s|B %s|%s",
                           avgs, netstats, battery, tmbln);
 		setstatus(status);
 		free(avgs);
