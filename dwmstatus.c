@@ -225,6 +225,18 @@ getbattery(char *base)
 }
 // END BATTERY
 
+// TEMPERATURE
+char *
+get_temp(char *base, char *sensor)
+{
+    char *co;
+
+    co = readfile(base, sensor);
+    if (co == NULL)
+        return smprintf("");
+    return smprintf("%02.0f C", atof(co) / 1000);
+}
+
 char *
 mktimes(char *fmt, char *tzname)
 {
@@ -273,6 +285,7 @@ int
 main(void)
 {
 	char *status;
+	char *temp;
 	char *avgs;
 	char *tmbln;
 	char *netstats;
@@ -284,15 +297,17 @@ main(void)
 	}
 
 	for (;;sleep(2)) {
+        temp = get_temp("/sys/class/hwmon/hwmon0", "temp1_input");
 		avgs = loadavg();
 		tmbln = mktimes("%a, %d %b %H:%M %Y", tzberlin);
         netstats = get_netusage();
         battery = getbattery("/sys/class/power_supply/BAT0/");
 
-        status = smprintf("L %s|N %s|B %s|%s",
-                          avgs, netstats, battery, tmbln);
+        status = smprintf("T %s|L %s|N %s|B %s|%s",
+                          temp, avgs, netstats, battery, tmbln);
 		setstatus(status);
 		free(avgs);
+		free(temp);
 		free(tmbln);
 		free(status);
 		free(netstats);
