@@ -12,15 +12,7 @@
 
 #include <X11/Xlib.h>
 
-char *tzberlin = "Europe/Amsterdam";
-
-//Colours
-const char *red = "\x1b[38;5;196m";
-const char *green = "\x1b[38;5;40m";
-const char *yellow = "\x1b[38;5;226m";
-const char *blue = "\x1b[38;5;21m";
-const char *grey = "\x1b[38;5;246m";
-const char *reset = "\x1b[0m";
+#include "config.h"
 
 static Display *dpy;
 
@@ -86,14 +78,14 @@ parse_netdev(unsigned long long int *receivedabs, unsigned long long int *sentab
 
     buf = (char *) calloc(255, 1);
     bufsize = 255;
-    devfd = fopen("/proc/net/dev", "r");
+    devfd = fopen(devfd_path, "r");
 
     // ignore the first two lines of the file
     fgets(buf, bufsize, devfd);
     fgets(buf, bufsize, devfd);
 
     while (fgets(buf, bufsize, devfd)) {
-        if ((wlan0start = strstr(buf, "wlan0:")) != NULL) {
+        if ((wlan0start = strstr(buf, net_interface)) != NULL) {
 
         // With thanks to the conky project at http://conky.sourceforge.net/
         sscanf(wlan0start + 6, "%llu  %*d     %*d  %*d  %*d  %*d   %*d        %*d       %llu",\
@@ -297,11 +289,11 @@ main(void)
 	}
 
 	for (;;sleep(2)) {
-        temp = get_temp("/sys/class/hwmon/hwmon0", "temp1_input");
+        temp = get_temp(temp_path, temp_label);
 		avgs = loadavg();
-		tmbln = mktimes("%a, %d %b %H:%M %Y", tzberlin);
+		tmbln = mktimes("%a, %d %b %H:%M %Y", tzone);
         netstats = get_netusage();
-        battery = getbattery("/sys/class/power_supply/BAT0/");
+        battery = getbattery(bat_path);
 
         status = smprintf("T %s|L %s|N %s|B %s|%s",
                           temp, avgs, netstats, battery, tmbln);
@@ -318,4 +310,3 @@ main(void)
 
 	return 0;
 }
-
