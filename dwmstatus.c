@@ -295,8 +295,7 @@ main(void)
         netstats = get_netusage();
         battery = getbattery(bat_path);
 
-        status = smprintf("T %s|L %s|N %s|B %s|%s",
-                          temp, avgs, netstats, battery, tmbln);
+        status = smprintf("B %s|%s", battery, tmbln);
 		setstatus(status);
 		free(avgs);
 		free(temp);
